@@ -13,7 +13,7 @@ services:
       - registry-net
 
   # 1. dockerhub 代理
-  dockerhub:
+  docker-hub:
     container_name: reg-docker-hub
     image: registry:latest
     restart: always
