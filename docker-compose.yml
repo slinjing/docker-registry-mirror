@@ -1,0 +1,167 @@
+services:
+  # Nginx 前端入口
+  nginx:
+    image: nginx:latest
+    container_name: registry-nginx
+    restart: always
+    ports:
+      - "443:443"  # 对外提供 443 端口访问
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./certs:/etc/nginx/certs
+    # depends_on:
+    #   - docker-hub
+    #   - ghcr
+    #   - gcr
+    #   - k8s-gcr
+    #   - k8s
+    #   - quay
+    #   - mcr 
+    #   - elastic 
+    #   - nvcr
+
+  # 1. dockerhub 代理
+  docker-hub:
+    container_name: reg-docker-hub
+    image: registry:latest
+    restart: always
+    environment:
+      - OTEL_TRACES_EXPORTER=none  # 禁用 OTEL 链路追踪功能
+      - TZ=Asia/Shanghai    
+    volumes:
+      - ./data/docker-hub:/var/lib/registry
+      - ./config/registry-hub.yml:/etc/distribution/config.yml
+    ports:
+      - 51000:5000
+    networks:
+      - registry-net
+
+  # 2. ghcr.io 代理
+  ghcr:
+    container_name: reg-ghcr
+    image: registry:latest
+    restart: always
+    environment:
+      - OTEL_TRACES_EXPORTER=none
+      - TZ=Asia/Shanghai    
+    volumes:
+      - ./data/ghcr:/var/lib/registry
+      - ./config/registry-ghcr.yml:/etc/distribution/config.yml
+    ports:
+      - 52000:5000
+    networks:
+      - registry-net
+
+  # 3. gcr.io 代理
+  gcr:
+    container_name: reg-gcr
+    image: registry:latest
+    restart: always
+    environment:
+      - OTEL_TRACES_EXPORTER=none
+    volumes:
+      - ./data/gcr:/var/lib/registry
+      - ./config/registry-gcr.yml:/etc/distribution/config.yml
+    ports:
+      - 53000:5000
+    networks:
+      - registry-net
+
+  # 4. k8s.gcr.io 代理
+  k8s-gcr:
+    container_name: reg-k8s-gcr
+    image: registry:latest
+    restart: always
+    environment:
+      - OTEL_TRACES_EXPORTER=none
+      - TZ=Asia/Shanghai    
+    volumes:
+      - ./data/k8s-gcr:/var/lib/registry
+      - ./config/registry-k8sgcr.yml:/etc/distribution/config.yml
+    ports:
+      - 54000:5000
+    networks:
+      - registry-net
+
+  # 5. registry.k8s.io 代理
+  k8s:
+    container_name: reg-k8s
+    image: registry:latest
+    restart: always
+    environment:
+      - OTEL_TRACES_EXPORTER=none
+      - TZ=Asia/Shanghai    
+    volumes:
+      - ./data/k8s:/var/lib/registry
+      - ./config/registry-k8s.yml:/etc/distribution/config.yml
+    ports:
+      - 55000:5000
+    networks:
+      - registry-net
+
+  # 6. quay.io 代理
+  quay:
+    container_name: reg-quay
+    image: registry:latest
+    restart: always
+    environment:
+      - OTEL_TRACES_EXPORTER=none
+      - TZ=Asia/Shanghai    
+    volumes:
+      - ./data/quay:/var/lib/registry
+      - ./config/registry-quay.yml:/etc/distribution/config.yml
+    ports:
+      - 56000:5000
+    networks:
+      - registry-net
+
+  # 7. mcr.microsoft.com 代理
+  mcr:
+    container_name: reg-mcr
+    image: registry:latest
+    restart: always
+    environment:
+      - OTEL_TRACES_EXPORTER=none
+      - TZ=Asia/Shanghai    
+    volumes:
+      - ./data/mcr:/var/lib/registry
+      - ./config/registry-mcr.yml:/etc/distribution/config.yml
+    ports:
+      - 57000:5000
+    networks:
+      - registry-net
+
+  # 8. docker.elastic.co 代理
+  elastic:
+    container_name: reg-elastic
+    image: registry:latest
+    restart: always
+    environment:
+      - OTEL_TRACES_EXPORTER=none
+      - TZ=Asia/Shanghai    
+    volumes:
+      - ./data/elastic:/var/lib/registry
+      - ./config/registry-elastic.yml:/etc/distribution/config.yml
+    ports:
+      - 58000:5000
+    networks:
+      - registry-net
+
+  # 9. nvcr.io 代理
+  nvcr:
+    container_name: reg-nvcr
+    image: registry:latest
+    restart: always
+    environment:
+      - OTEL_TRACES_EXPORTER=none
+      - TZ=Asia/Shanghai    
+    volumes:
+      - ./data/nvcr:/var/lib/registry
+      - ./config/registry-nvcr.yml:/etc/distribution/config.yml
+    ports:
+      - 59000:5000
+    networks:
+      - registry-net  
+
+networks:
+  registry-net:
