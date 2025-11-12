@@ -1,26 +1,24 @@
-# Docker 多架构多仓库镜像加速器
-基于 Docker Registry + Cloudflare 自建镜像加速器，支持 ARM/AMD64 多架构，适配 Docker Hub、K8s 官方仓库（registry.k8s.io/k8s.gcr.io）、GCR、Quay.io 等主流镜像仓库，解决镜像拉取慢、访问受限问题。
+# Docker-Registry-Mirror 镜像加速器
+本项目参考了 Docker-Proxy 项目，基于官方 Registry + Nginx 反向代理构建，是一款支持 多架构（AMD64/ARM64/ARMv7 等） 的 Docker 镜像加速代理服务。核心解决 Docker Hub、k8s.gcr.io、ghcr.io 等主流仓库因网络限制导致的拉取缓慢 / 失败问题，同时完美兼容多架构镜像分发，满足不同硬件环境（如 x86 服务器、ARM 开发板）的使用需求。
 
 
-## ✨ 核心特性
-- **多仓库支持**：Docker Hub、registry.k8s.io、k8s.gcr.io、gcr.io、quay.io
-- **多架构兼容**：自动适配 ARM64（arm）、AMD64（x86_64）客户端
-- **HTTPS 加密**：基于 Let's Encrypt 免费证书，安全无风险
-- **缓存管理**：100G 缓存容量，LRU 自动清理最久未使用镜像
-- **Cloudflare 适配**：支持 CF 代理模式，域名访问稳定可靠
-- **K8s 兼容**：支持 Containerd/Docker 运行时，无缝集成 K8s 集群
+## ✨ 功能特点
+- 支持 Docker Hub、k8s.gcr.io、ghcr.io 等主流镜像仓库的代理加速
+- 基于 Docker Compose 一键部署，操作简单
+- 可配置 SSL 证书，保障通信安全
+- 支持客户端通过简单配置实现镜像加速拉取
 
 
 ## 🚀 快速部署（管理员操作）
 ### 前置条件
 - 服务器：ARM/AMD64 架构，开放 80（证书申请）、443（HTTPS）端口
-- 域名：已解析到服务器 IP（如 `csg.cloudns.ch`），托管至 Cloudflare
+- 域名：已解析到服务器 IP，本项目使用免费域名托管至 Cloudflare
 - 环境：已安装 Docker（20.10+）
 
 
 ### 1. 克隆项目
 ```bash
-git clone https://github.com/你的用户名/docker-registry-mirror.git
+git clone https://github.com/slinjing/docker-registry-mirror.git
 cd docker-registry-mirror
 ```
 
@@ -37,16 +35,29 @@ chmod +x scripts/install-docker-compose.sh
 apt install -y certbot
 
 # 申请证书（替换为你的域名和邮箱）
-certbot certonly --standalone -d csg.cloudns.ch --email your-email@xxx.com --agree-tos --non-interactive
+certbot certonly --standalone -d your-domain.com --email your-email@xxx.com --agree-tos --non-interactive
 
 # 复制证书到项目目录
 mkdir -p certs
-cp /etc/letsencrypt/live/csg.cloudns.ch/fullchain.pem certs/
-cp /etc/letsencrypt/live/csg.cloudns.ch/privkey.pem certs/
+cp /etc/letsencrypt/live/your-domain.com/fullchain.pem certs/
+cp /etc/letsencrypt/live/your-domain.com/privkey.pem certs/
 chmod -R 644 certs/
 ```
 
-### 4. 启动服务
+### 4. 修改 nginx 配置文件
+将 server_name 字段的值改为自己的域名，并且确保证书路径一致。
+
+```bash
+    server {
+        listen       443 ssl;  
+        server_name  shulin.qzz.io;  # 替换为你的域名
+
+        # Certbot 证书路径
+        ssl_certificate      /etc/nginx/certs/fullchain.pem;
+        ssl_certificate_key  /etc/nginx/certs/privkey.pem;
+```
+
+### 5. 启动服务
 ```bash
 # 启动镜像加速器（后台运行）
 docker-compose up -d
@@ -55,14 +66,14 @@ docker-compose up -d
 docker-compose ps
 ```
 
-### 5. 证书自动续期
+### 6. 证书自动续期
 添加定时任务，自动续期 Let's Encrypt 证书（有效期 90 天）：
 ```bash
 # 编辑定时任务
 crontab -e
 
 # 添加以下内容（每月1号凌晨3点续期）
-0 3 1 * * certbot renew --quiet && cp /etc/letsencrypt/live/csg.cloudns.ch/fullchain.pem /path/to/docker-registry-mirror/certs/ && cp /etc/letsencrypt/live/csg.cloudns.ch/privkey.pem /path/to/docker-registry-mirror/certs/ && docker-compose restart
+0 3 1 * * certbot renew --quiet && cp /etc/letsencrypt/live/your-domain.com/fullchain.pem /path/to/docker-registry-mirror/certs/ && cp /etc/letsencrypt/live/your-domain.com/privkey.pem /path/to/docker-registry-mirror/certs/ && docker-compose restart
 ```
 
 
@@ -71,13 +82,11 @@ crontab -e
 编辑 Docker 配置文件 `/etc/docker/daemon.json：`
 ```bash
 {
-  "registry-mirrors": ["https://csg.cloudns.ch"],
-  "registry-config": {
-    "k8s.gcr.io": { "mirror": ["https://csg.cloudns.ch"] },
-    "registry.k8s.io": { "mirror": ["https://csg.cloudns.ch"] },
-    "gcr.io": { "mirror": ["https://csg.cloudns.ch"] },
-    "quay.io": { "mirror": ["https://csg.cloudns.ch"] }
-  }
+    "registry-mirrors": ["https://your-domain.com"],
+    "log-opts": {
+        "max-size": "100m",
+        "max-file": "5"
+    }
 }
 ```
 
@@ -86,77 +95,18 @@ crontab -e
 systemctl daemon-reload && systemctl restart docker
 ```
 
-### 2. K8s 集群配置（Containerd 运行时）
-编辑所有 K8s 节点的 /etc/containerd/config.toml，替换 registry 节点配置：
-```toml
-[plugins."io.containerd.grpc.v1.cri".registry]
-  config_path = ""
-
-  [plugins."io.containerd.grpc.v1.cri".registry.mirrors]
-    [plugins."io.containerd.grpc.v1.cri".registry.mirrors."docker.io"]
-      endpoint = ["https://csg.cloudns.ch"]
-    [plugins."io.containerd.grpc.v1.cri".registry.mirrors."registry.k8s.io"]
-      endpoint = ["https://csg.cloudns.ch"]
-    [plugins."io.containerd.grpc.v1.cri".registry.mirrors."k8s.gcr.io"]
-      endpoint = ["https://csg.cloudns.ch"]
-    [plugins."io.containerd.grpc.v1.cri".registry.mirrors."gcr.io"]
-      endpoint = ["https://csg.cloudns.ch"]
-    [plugins."io.containerd.grpc.v1.cri".registry.mirrors."quay.io"]
-      endpoint = ["https://csg.cloudns.ch"]
-
-  [plugins."io.containerd.grpc.v1.cri".registry.configs]
-    [plugins."io.containerd.grpc.v1.cri".registry.configs."csg.cloudns.ch".tls]
-      ca_file = "/etc/containerd/certs.d/isrgrootx1.pem"
-```
-
-安装根证书并重启 Containerd：
+### 2. 拉取镜像
+拉取 Docker Hub 镜像：直接使用 docker pull + 镜像名 即可，例如：
 ```bash
-mkdir -p /etc/containerd/certs.d
-curl -o /etc/containerd/certs.d/isrgrootx1.pem https://letsencrypt.org/certs/isrgrootx1.pem
-systemctl restart containerd
-```
-
-### 3. 镜像拉取（无需修改命令）
-直接使用官方仓库地址拉取，加速器自动拦截加速：
-```bash
-# Docker Hub
 docker pull nginx:latest
-
-# K8s 官方仓库
-docker pull registry.k8s.io/pause:3.9
-
-# GCR
-docker pull gcr.io/google-containers/busybox:1.35
-
-# Quay.io
-docker pull quay.io/etcd-io/etcd:v3.5.9
+docker pull redis:alpine
 ```
 
-
-## 🔧 校验工具
-使用脚本快速验证加速器可用性、多仓库兼容性、架构适配：
+拉取其他仓库镜像：需要在镜像名称前加上你的域名，例如拉取 k8s.gcr.io 仓库的镜像：
 ```bash
-# 下载校验脚本
-curl -O https://csg.cloudns.ch/check-registry-multi-repo.sh
-# 或从项目中获取
-chmod +x scripts/check-registry-multi-repo.sh
-
-# 执行校验
-./scripts/check-registry-multi-repo.sh
+docker pull your-domain.com/k8s.gcr.io/kube-apiserver:v1.19.0
 ```
 
-## 📚 详细文档
-用户使用手册：完整客户端 / K8s 配置、问题排查
-部署指南：管理员进阶配置（访问限制、缓存调整等）
-
-
-## ❌ 常见问题
-| 问题现象 | 解决方案 |
-| ------- | ------- |
-| 证书错误 `x509: certificate signed by unknown authority` | 参考使用手册，手动安装 Let's Encrypt 根证书 |
-| K8s 拉取失败 `ImagePullBackOff` | 确认所有节点配置 Containerd 并安装证书，执行 `systemctl restart containerd` |
-| 缓存未生效（二次拉取未提速） | 	确认拉取同一标签镜像，大镜像（如 ingress-controller）提速效果更明显 |
-| 多仓库加速未生效 | 	检查 Docker/Containerd 配置文件中仓库映射是否正确，重启对应服务 |
 
 
 ## 📄 许可证

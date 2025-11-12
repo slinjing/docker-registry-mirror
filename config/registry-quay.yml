@@ -14,9 +14,21 @@ storage:
   filesystem:
     rootdirectory: /var/lib/registry
   #inmemory: # 此存储驱动程序不会在运行期间保留任何数据,适合磁盘空间小的机器使用(但是会使用内存开销,只适合测试)
+  # 维护（清理）策略配置
   maintenance:
     uploadpurging:
-      enabled: false
+      enabled: true  # 启用上传清理（清理未完成的临时上传文件）
+      age: 24h       # 清理超过24小时的未完成上传
+      interval: 1h   # 每1小时检查一次
+      dryrun: false  # 不启用dryrun（实际执行清理）
+    # 镜像清理策略（基于标签和最后访问时间）
+    garbagecollect:
+      enabled: true
+      schedule: 0 0 * * *  # 每天凌晨执行垃圾回收（cron表达式）
+    # 配额限制（可选，结合大小限制增强清理效果）
+    quota:
+      enabled: true
+      maxsize: 5G  # 总缓存不超过5G，触发时清理旧镜像
   tag:
     concurrencylimit: 8
   delete:
