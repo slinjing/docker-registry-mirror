@@ -1,5 +1,5 @@
 # Docker-Registry-Mirror 镜像加速器
-本项目参考了 Docker-Proxy 项目，基于官方 Registry + Nginx 反向代理构建，是一款支持 多架构（AMD64/ARM64/ARMv7 等） 的 Docker 镜像加速代理服务。核心解决 Docker Hub、k8s.gcr.io、ghcr.io 等主流仓库因网络限制导致的拉取缓慢 / 失败问题，同时完美兼容多架构镜像分发，满足不同硬件环境（如 x86 服务器、ARM 开发板）的使用需求。
+本项目参考了 [Docker-Proxy](https://github.com/dqzboy/Docker-Proxy) 项目，基于官方 Registry + Nginx 反向代理构建，是一款支持 多架构（AMD64/ARM64/ARMv7 等） 的 Docker 镜像加速代理服务。核心解决 Docker Hub、k8s.gcr.io、ghcr.io 等主流仓库因网络限制导致的拉取缓慢 / 失败问题，同时完美兼容多架构镜像分发，满足不同硬件环境（如 x86 服务器、ARM 开发板）的使用需求。
 
 
 ## ✨ 功能特点
